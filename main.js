@@ -1,209 +1,295 @@
 "use strict";
-// Enums
+// ============= Enums =============
 var TaskStatus;
 (function (TaskStatus) {
     TaskStatus["Pending"] = "Pending";
     TaskStatus["InProgress"] = "In Progress";
     TaskStatus["Completed"] = "Completed";
 })(TaskStatus || (TaskStatus = {}));
-// Abstract User class
+// ============= Classes Base =============
 class User {
-    constructor(id, name, email, password) {
-        this.id = id;
-        this.name = name;
-        this.email = email;
-        this.password = password;
+    constructor(_id, _name, _email, _password) {
+        this._id = _id;
+        this._name = _name;
+        this._email = _email;
+        this._password = _password;
+        this._notifications = []; // Composição (1-*)
+        this._tasks = []; // Agregação (*-*)
+        this._events = []; // Agregação (*-*)
+    }
+    // Getters básicos
+    get id() { return this._id; }
+    get name() { return this._name; }
+    get email() { return this._email; }
+    // Métodos para AppNotification (Composição 1-*)
+    addNotification(message) {
+        const notification = new AppNotification(this._notifications.length + 1, message, false, new Date(), this);
+        this._notifications.push(notification);
+        return notification;
+    }
+    get notifications() {
+        return [...this._notifications];
+    }
+    // Métodos para Task (Agregação *-*)
+    assignTask(task) {
+        if (!this._tasks.some(t => t.id === task.id)) {
+            this._tasks.push(task);
+            task.assignUser(this);
+        }
+    }
+    get tasks() {
+        return [...this._tasks];
+    }
+    // Métodos para AppEvent (Agregação *-*)
+    registerForEvent(event) {
+        if (!this._events.some(e => e.id === event.id)) {
+            this._events.push(event);
+            event.addParticipant(this);
+        }
+    }
+    get events() {
+        return [...this._events];
+    }
+    authentication() {
+        // Lógica de autenticação padrão para todos os usuários
+        return this.email.endsWith("@empresa.com") && this._password.length > 6;
     }
     changePassword(newPassword) {
-        this.password = newPassword;
+        this._password = newPassword;
     }
     updateProfile(updateData) {
         Object.assign(this, updateData);
     }
 }
-// Notification class
-class AppNotification {
-    constructor(id, message, isRead = false, createdAt = new Date(), recipient // Composition with User
-    ) {
-        this.id = id;
-        this.message = message;
-        this.isRead = isRead;
-        this.createdAt = createdAt;
-        this.recipient = recipient;
+// ============= Classes Especializadas (Herança) =============
+class Manager extends User {
+    constructor(id, name, email, password, _department) {
+        super(id, name, email, password);
+        this._department = _department;
+        this._employees = []; // Agregação (1-*)
     }
-    markAsRead() {
-        this.isRead = true;
-    }
-}
-// Task class
-class Task {
-    constructor(id, description, timeLimit, conclusionTime = null, status = TaskStatus.Pending, assignedTo // Aggregation with User
-    ) {
-        this.id = id;
-        this.description = description;
-        this.timeLimit = timeLimit;
-        this.conclusionTime = conclusionTime;
-        this.status = status;
-        this.assignedTo = assignedTo;
-        // Association with Notification
-        this.notifications = [];
-    }
-    isFinished() {
-        return this.status === TaskStatus.Completed;
-    }
-    updateStatus(newStatus) {
-        this.status = newStatus;
-        if (newStatus === TaskStatus.Completed) {
-            this.conclusionTime = new Date();
+    get department() { return this._department; }
+    // Métodos para Employee (Agregação 1-*)
+    addEmployee(employee) {
+        if (!this._employees.some(e => e.id === employee.id)) {
+            this._employees.push(employee);
+            employee.manager = this;
         }
     }
-    addNotification(notification) {
-        this.notifications.push(notification);
+    get employees() {
+        return [...this._employees];
     }
 }
-// Event class
-class AppEvent {
-    constructor(name, dateStart, dateFinish, description, location, createdBy // Composition with Admin
-    ) {
-        this.name = name;
-        this.dateStart = dateStart;
-        this.dateFinish = dateFinish;
-        this.description = description;
-        this.location = location;
-        this.createdBy = createdBy;
-        // Association with Notification
-        this.notifications = [];
-        // Aggregation with User (participants)
-        this.participants = [];
-    }
-    warning() {
-        console.log(`Event "${this.name}" is approaching!`);
-    }
-    addNotification(notification) {
-        this.notifications.push(notification);
-    }
-    addParticipant(user) {
-        this.participants.push(user);
-    }
-}
-// Manager class (inherits from User)
-class Manager extends User {
-    constructor(id, name, email, password, department) {
-        super(id, name, email, password);
-        this.department = department;
-        // Aggregation with Employee
-        this.employees = [];
-    }
-    authentication() {
-        // Manager-specific authentication logic
-        return true;
-    }
-    assignJob(task, employee) {
-        task.assignedTo = employee;
-        console.log(`Task "${task.description}" assigned to ${employee.name}`);
-    }
-    addEmployee(employee) {
-        this.employees.push(employee);
-    }
-}
-// Employee class (inherits from User)
 class Employee extends User {
-    constructor(id, name, email, password, position, shift, manager // Aggregation with Manager
+    constructor(id, name, email, password, _position, _shift, _manager // Agregação (*-1)
     ) {
         super(id, name, email, password);
-        this.position = position;
-        this.shift = shift;
-        this.manager = manager;
+        this._position = _position;
+        this._shift = _shift;
+        this._manager = _manager;
     }
-    authentication() {
-        // Employee-specific authentication logic
-        return true;
-    }
+    get manager() { return this._manager; }
+    set manager(manager) { this._manager = manager; }
 }
-// Admin class (inherits from User)
 class Admin extends User {
     constructor(id, name, email, password) {
         super(id, name, email, password);
+        this._createdEvents = []; // Composição (1-*)
+        this._generatedReports = []; // Associação (*-*)
     }
-    authentication() {
-        // Admin-specific authentication logic
-        return true;
-    }
-    createUser(userData) {
-        // In a real implementation, this would return a Manager, Employee or Admin
-        const id = Math.floor(Math.random() * 1000);
-        return new Employee(id, userData.name, userData.email, userData.password, "", "");
-    }
-    updateUser(user, updateData) {
-        user.updateProfile(updateData);
-    }
-    deleteUser(user) {
-        console.log(`User ${user.name} deleted`);
-    }
+    // Métodos para AppEvent (Composição 1-*)
     createEvent(eventData) {
-        return new AppEvent(eventData.name, eventData.dateStart, eventData.dateFinish, eventData.description, eventData.location, this);
+        const event = new AppEvent(this._createdEvents.length + 1, eventData.name, eventData.dateStart, eventData.dateFinish, eventData.description, eventData.location, this);
+        this._createdEvents.push(event);
+        return event;
     }
-    updateEvent(event, updateData) {
-        Object.assign(event, updateData);
+    get createdEvents() {
+        return [...this._createdEvents];
     }
-    deleteEvent(event) {
-        console.log(`Event "${event.name}" deleted`);
+    // Métodos para Report (Associação *-*)
+    generateReport(type, content) {
+        const report = new CustomReport(this._generatedReports.length + 1, new Date(), type, content);
+        this._generatedReports.push(report);
+        return report;
     }
-}
-// Report class
-class CustomReport {
-    constructor(id, date, type, content) {
-        this.id = id;
-        this.date = date;
-        this.type = type;
-        this.content = content;
-    }
-    generateReport() {
-        return this.content;
+    get reports() {
+        return [...this._generatedReports];
     }
 }
-// Product class
-class Product {
-    constructor(id, name, description, price, category, supplier) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.price = price;
-        this.category = category;
-        this.supplier = supplier;
+// ============= Classes de Domínio =============
+class Task {
+    constructor(_id, _description, _timeLimit, _conclusionTime = null, _status = TaskStatus.Pending) {
+        this._id = _id;
+        this._description = _description;
+        this._timeLimit = _timeLimit;
+        this._conclusionTime = _conclusionTime;
+        this._status = _status;
+        this._subTasks = []; // Auto-Agregação (*-*)
+        this._assignedUsers = []; // Agregação (*-*)
+        this._notifications = []; // Associação (*-*)
     }
-}
-// Sale class
-class Sale {
-    constructor(id, date, products = [] // Composition with Product
-    ) {
-        this.id = id;
-        this.date = date;
-        this.products = products;
+    // Getter for id
+    get id() {
+        return this._id;
     }
-    totalAmount() {
-        return this.products.reduce((sum, product) => sum + product.price, 0);
-    }
-}
-// Stock class
-class Stock {
-    constructor(id, currentQuantity, expirationDate) {
-        this.id = id;
-        this.currentQuantity = currentQuantity;
-        this.expirationDate = expirationDate;
-        this.products = []; // Composition with Product
-    }
-    registerProduct(product) {
-        this.products.push(product);
-    }
-    updateProduct(productId, updateData) {
-        const product = this.products.find(p => p.id === productId);
-        if (product) {
-            Object.assign(product, updateData);
+    // Métodos para User (Agregação *-*)
+    assignUser(user) {
+        if (!this._assignedUsers.some(u => u.id === user.id)) {
+            this._assignedUsers.push(user);
+            user.assignTask(this);
         }
     }
-    deleteProduct(productId) {
-        this.products = this.products.filter(p => p.id !== productId);
+    get assignedUsers() {
+        return [...this._assignedUsers];
+    }
+    // Métodos para AppNotification (Associação *-*)
+    addNotification(notification) {
+        if (!this._notifications.some(n => n.id === notification.id)) {
+            this._notifications.push(notification);
+        }
+    }
+    get notifications() {
+        return [...this._notifications];
+    }
+    // Métodos para Task (Associação recursiva *-*)
+    addSubTask(task) {
+        if (!this._subTasks.some(t => t.id === task.id)) {
+            this._subTasks.push(task);
+        }
+    }
+    get subTasks() {
+        return [...this._subTasks];
+    }
+    // Outros métodos
+    updateStatus(newStatus) {
+        this._status = newStatus;
+        if (newStatus === TaskStatus.Completed) {
+            this._conclusionTime = new Date();
+        }
+    }
+    isFinished() {
+        return this._status === TaskStatus.Completed;
+    }
+}
+class AppEvent {
+    constructor(_id, _name, _dateStart, _dateFinish, _description, _location, _createdBy // Composição (*-1)
+    ) {
+        this._id = _id;
+        this._name = _name;
+        this._dateStart = _dateStart;
+        this._dateFinish = _dateFinish;
+        this._description = _description;
+        this._location = _location;
+        this._createdBy = _createdBy;
+        this._participants = []; // Agregação (*-*)
+        this._notifications = []; // Associação (*-*)
+    }
+    // Getter for id
+    get id() {
+        return this._id;
+    }
+    // Métodos para User (Agregação *-*)
+    addParticipant(user) {
+        if (!this._participants.some(p => p.id === user.id)) {
+            this._participants.push(user);
+            user.registerForEvent(this);
+        }
+    }
+    get participants() {
+        return [...this._participants];
+    }
+    // Métodos para AppNotification (Associação *-*)
+    addNotification(notification) {
+        if (!this._notifications.some(n => n.id === notification.id)) {
+            this._notifications.push(notification);
+        }
+    }
+    get notifications() {
+        return [...this._notifications];
+    }
+    // Outros métodos
+    warning() {
+        console.log(`AppEvent "${this._name}" is coming soon!`);
+    }
+}
+class AppNotification {
+    constructor(_id, _message, _isRead, _createdAt, _recipient // Composição (*-1)
+    ) {
+        this._id = _id;
+        this._message = _message;
+        this._isRead = _isRead;
+        this._createdAt = _createdAt;
+        this._recipient = _recipient;
+    }
+    // Getter for id
+    get id() {
+        return this._id;
+    }
+    markAsRead() {
+        this._isRead = true;
+    }
+}
+class CustomReport {
+    constructor(_id, _date, _type, _content) {
+        this._id = _id;
+        this._date = _date;
+        this._type = _type;
+        this._content = _content;
+    }
+    generateReport() {
+        return this._content;
+    }
+}
+class Resource {
+    constructor(_id, _name, _description, _price, _category, _supplier) {
+        this._id = _id;
+        this._name = _name;
+        this._description = _description;
+        this._price = _price;
+        this._category = _category;
+        this._supplier = _supplier;
+    }
+    get id() {
+        return this._id;
+    }
+    get price() {
+        return this._price;
+    }
+}
+class Sale {
+    get resources() {
+        return [...this._resources];
+    }
+    constructor(_id, _date) {
+        this._id = _id;
+        this._date = _date;
+        this._resources = []; // Composição (*-*)
+    }
+    Resource(resource) {
+        this._resources.push(resource);
+    }
+    totalAmount() {
+        return this._resources.reduce((sum, resource) => sum + resource.price, 0);
+    }
+}
+class ResourceGroup {
+    constructor(_id, _currentQuantity, _expirationDate) {
+        this._id = _id;
+        this._currentQuantity = _currentQuantity;
+        this._expirationDate = _expirationDate;
+        this._resources = []; // Composição (*-*)
+    }
+    registerResource(resource) {
+        this._resources.push(resource);
+    }
+    updateResource(resourceId, updateData) {
+        const resource = this._resources.find(p => p.id === resourceId);
+        if (resource) {
+            Object.assign(resource, updateData);
+        }
+    }
+    deleteResource(resourceId) {
+        this._resources = this._resources.filter(p => p.id !== resourceId);
     }
 }
 // ========== Example Usage ==========
@@ -216,47 +302,37 @@ console.log(manager);
 console.log(employee);
 console.log("\n=== Task Management ===");
 const task = new Task(1, "Complete sales report", new Date('2023-12-31'));
-manager.assignJob(task, employee);
+manager.assignTask(task);
 task.updateStatus(TaskStatus.InProgress);
 console.log(task);
-console.log("\n=== Event Management ===");
+console.log("\n=== AppEvent Management ===");
 const evento = admin.createEvent({
     name: "Company Meeting",
     dateStart: new Date('2023-11-15'),
     dateFinish: new Date('2023-11-16'),
     description: "Annual company meeting",
     location: "Main Office",
-    warning: function () {
-        throw new Error("Function not implemented.");
-    },
-    notifications: [],
-    addNotification: function (notification) {
-        throw new Error("Function not implemented.");
-    },
-    participants: [],
-    addParticipant: function (user) {
-        throw new Error("Function not implemented.");
-    }
 });
 evento.addParticipant(manager);
 evento.addParticipant(employee);
 console.log(evento);
 console.log("\n=== Notifications ===");
 const notif1 = new AppNotification(1, "New task assigned", false, new Date(), employee);
-const notif2 = new AppNotification(2, "Event reminder", false, new Date(), manager);
+const notif2 = new AppNotification(2, "AppEvent reminder", false, new Date(), manager);
 task.addNotification(notif1);
 evento.addNotification(notif2);
 console.log(notif1);
 console.log(notif2);
-console.log("\n=== Product & Sales ===");
-const product = new Product(1, "Laptop", "High performance laptop", 999.99, "Electronics", "Tech Supplier");
+console.log("\n=== Resource & Sales ===");
+const resource = new Resource(1, "Laptop", "High performance laptop", 999.99, "Electronics", "Tech Supplier");
 const sale = new Sale(1, new Date());
-sale.products.push(product);
+// Add resource to the sale
+sale.Resource(resource);
 console.log("Sale total:", sale.totalAmount());
-console.log("\n=== Stock Management ===");
-const stock = new Stock(1, 10, new Date('2024-12-31'));
-stock.registerProduct(product);
-console.log(stock);
+console.log("\n=== ResourceGroup Management ===");
+const resourceGroup = new ResourceGroup(1, 10, new Date('2024-12-31'));
+resourceGroup.registerResource(resource);
+console.log(resourceGroup);
 console.log("\n=== Report Generation ===");
 const report = new CustomReport(1, new Date(), "Sales", "Monthly sales report");
 console.log(report.generateReport());
