@@ -8,227 +8,470 @@ var TaskStatus;
 })(TaskStatus || (TaskStatus = {}));
 // ============= Classes Base =============
 class User {
-    constructor(id, name, email, password) {
-        this.id = id;
-        this.name = name;
-        this.email = email;
-        this.password = password;
-        this.notifications = []; // Composição (1-*)
-        this.tasks = []; // Agregação (*-*)
-        this.events = []; // Agregação (*-*)
+    constructor(_id, _name, _email, _password) {
+        this._id = _id;
+        this._name = _name;
+        this._email = _email;
+        this._password = _password;
+        this._notifications = [];
+        this._tasks = [];
+        this._events = [];
     }
-    // Métodos para AppNotification (Composição 1-*)
+    get id() {
+        return this._id;
+    }
+    get name() {
+        return this._name;
+    }
+    set name(value) {
+        this._name = value;
+    }
+    get email() {
+        return this._email;
+    }
+    set email(value) {
+        this._email = value;
+    }
+    get password() {
+        return this._password;
+    }
+    set password(value) {
+        this._password = value;
+    }
+    get notifications() {
+        return this._notifications;
+    }
+    get tasks() {
+        return this._tasks;
+    }
+    get events() {
+        return this._events;
+    }
     addNotification(message) {
-        const notification = new AppNotification(this.notifications.length + 1, message, false, new Date(), this);
-        this.notifications.push(notification);
+        const notification = new AppNotification(this._notifications.length + 1, message, false, new Date(), this);
+        this._notifications.push(notification);
         return notification;
     }
-    // Métodos para Task (Agregação *-*)
     assignTask(task) {
-        if (!this.tasks.some(t => t.id === task.id)) {
-            this.tasks.push(task);
+        if (!this._tasks.some(t => t.id === task.id)) {
+            this._tasks.push(task);
             task.assignUser(this);
         }
     }
-    // Métodos para AppEvent (Agregação *-*)
     registerForEvent(event) {
-        if (!this.events.some(e => e.id === event.id)) {
-            this.events.push(event);
+        if (!this._events.some(e => e.id === event.id)) {
+            this._events.push(event);
             event.addParticipant(this);
         }
     }
     authentication() {
-        // Lógica de autenticação padrão para todos os usuários
-        return this.email.endsWith("@empresa.com") && this.password.length > 6;
+        return this._email.endsWith("@empresa.com") && this._password.length > 6;
     }
     changePassword(newPassword) {
-        this.password = newPassword;
+        this._password = newPassword;
     }
     updateProfile(updateData) {
         Object.assign(this, updateData);
     }
 }
-// ============= Classes Especializadas (Herança) =============
 class Manager extends User {
-    constructor(id, name, email, password, department) {
+    constructor(id, name, email, password, _department) {
         super(id, name, email, password);
-        this.department = department;
-        this.employees = []; // Agregação (1-*)
+        this._department = _department;
+        this._employees = [];
     }
-    // Métodos para Employee (Agregação 1-*)
+    get department() {
+        return this._department;
+    }
+    set department(value) {
+        this._department = value;
+    }
+    get employees() {
+        return this._employees;
+    }
     addEmployee(employee) {
-        if (!this.employees.some(e => e.id === employee.id)) {
-            this.employees.push(employee);
+        if (!this._employees.some(e => e.id === employee.id)) {
+            this._employees.push(employee);
             employee.manager = this;
         }
     }
 }
 class Employee extends User {
-    constructor(id, name, email, password, position, shift, manager // Agregação (*-1)
-    ) {
+    constructor(id, name, email, password, _position, _shift, manager) {
         super(id, name, email, password);
-        this.position = position;
-        this.shift = shift;
-        this.manager = manager;
+        this._position = _position;
+        this._shift = _shift;
+        this._manager = manager;
+    }
+    get position() {
+        return this._position;
+    }
+    set position(value) {
+        this._position = value;
+    }
+    get shift() {
+        return this._shift;
+    }
+    set shift(value) {
+        this._shift = value;
+    }
+    get manager() {
+        return this._manager;
+    }
+    set manager(value) {
+        this._manager = value;
     }
 }
 class Admin extends User {
-    constructor(id, name, email, password) {
-        super(id, name, email, password);
-        this.createdEvents = []; // Composição (1-*)
-        this.generatedReports = []; // Associação (*-*)
+    constructor() {
+        super(...arguments);
+        this._createdEvents = [];
+        this._generatedReports = [];
     }
-    // Métodos para AppEvent (Composição 1-*)
+    get createdEvents() {
+        return this._createdEvents;
+    }
+    get generatedReports() {
+        return this._generatedReports;
+    }
     createEvent(eventData) {
-        const event = new AppEvent(this.createdEvents.length + 1, eventData.name, eventData.dateStart, eventData.dateFinish, eventData.description, eventData.location, this);
-        this.createdEvents.push(event);
+        const event = new AppEvent(this._createdEvents.length + 1, eventData.name, eventData.dateStart, eventData.dateFinish, eventData.description, eventData.location, this);
+        this._createdEvents.push(event);
         return event;
     }
-    // Métodos para Report (Associação *-*)
     generateReport(type, content) {
-        const report = new CustomReport(this.generatedReports.length + 1, new Date(), type, content);
-        this.generatedReports.push(report);
+        const report = new CustomReport(this._generatedReports.length + 1, new Date(), type, content);
+        this._generatedReports.push(report);
         return report;
     }
 }
 // ============= Classes de Domínio =============
 class Task {
-    constructor(id, description, timeLimit, conclusionTime = null, status = TaskStatus.Pending) {
-        this.id = id;
-        this.description = description;
-        this.timeLimit = timeLimit;
-        this.conclusionTime = conclusionTime;
-        this.status = status;
-        this.subTasks = []; // Auto-Agregação (*-*)
-        this.assignedUsers = []; // Agregação (*-*)
-        this.notifications = []; // Associação (*-*)
+    constructor(_id, _description, _timeLimit, _conclusionTime = null, _status = TaskStatus.Pending) {
+        this._id = _id;
+        this._description = _description;
+        this._timeLimit = _timeLimit;
+        this._conclusionTime = _conclusionTime;
+        this._status = _status;
+        this._subTasks = []; // Auto-Agregação (*-*)
+        this._assignedUsers = []; // Agregação (*-*)
+        this._notifications = []; // Associação (*-*)
+    }
+    get id() {
+        return this._id;
+    }
+    get description() {
+        return this._description;
+    }
+    set description(value) {
+        this._description = value;
+    }
+    get timeLimit() {
+        return this._timeLimit;
+    }
+    set timeLimit(value) {
+        this._timeLimit = value;
+    }
+    get conclusionTime() {
+        return this._conclusionTime;
+    }
+    set conclusionTime(value) {
+        this._conclusionTime = value;
+    }
+    get status() {
+        return this._status;
+    }
+    set status(value) {
+        this._status = value;
+    }
+    get subTasks() {
+        return this._subTasks;
+    }
+    get assignedUsers() {
+        return this._assignedUsers;
+    }
+    get notifications() {
+        return this._notifications;
     }
     // Métodos para User (Agregação *-*)
     assignUser(user) {
-        if (!this.assignedUsers.some(u => u.id === user.id)) {
-            this.assignedUsers.push(user);
+        if (!this._assignedUsers.some(u => u.id === user.id)) {
+            this._assignedUsers.push(user);
             user.assignTask(this);
         }
     }
     // Métodos para AppNotification (Associação *-*)
     addNotification(notification) {
-        if (!this.notifications.some(n => n.id === notification.id)) {
-            this.notifications.push(notification);
+        if (!this._notifications.some(n => n.id === notification.id)) {
+            this._notifications.push(notification);
         }
     }
     // Métodos para Task (Associação recursiva *-*)
     addSubTask(task) {
-        if (!this.subTasks.some(t => t.id === task.id)) {
-            this.subTasks.push(task);
+        if (!this._subTasks.some(t => t.id === task.id)) {
+            this._subTasks.push(task);
         }
     }
     // Outros métodos
     updateStatus(newStatus) {
-        this.status = newStatus;
+        this._status = newStatus;
         if (newStatus === TaskStatus.Completed) {
-            this.conclusionTime = new Date();
+            this._conclusionTime = new Date();
         }
     }
     isFinished() {
-        return this.status === TaskStatus.Completed;
+        return this._status === TaskStatus.Completed;
     }
 }
 class AppEvent {
-    constructor(id, name, dateStart, dateFinish, description, location, createdBy // Composição (*-1)
+    constructor(_id, _name, _dateStart, _dateFinish, _description, _location, _createdBy // Composição (*-1)
     ) {
-        this.id = id;
-        this.name = name;
-        this.dateStart = dateStart;
-        this.dateFinish = dateFinish;
-        this.description = description;
-        this.location = location;
-        this.createdBy = createdBy;
-        this.participants = []; // Agregação (*-*)
-        this.notifications = []; // Associação (*-*)
+        this._id = _id;
+        this._name = _name;
+        this._dateStart = _dateStart;
+        this._dateFinish = _dateFinish;
+        this._description = _description;
+        this._location = _location;
+        this._createdBy = _createdBy;
+        this._participants = []; // Agregação (*-*)
+        this._notifications = []; // Associação (*-*)
+    }
+    get id() {
+        return this._id;
+    }
+    get name() {
+        return this._name;
+    }
+    set name(value) {
+        this._name = value;
+    }
+    get dateStart() {
+        return this._dateStart;
+    }
+    set dateStart(value) {
+        this._dateStart = value;
+    }
+    get dateFinish() {
+        return this._dateFinish;
+    }
+    set dateFinish(value) {
+        this._dateFinish = value;
+    }
+    get description() {
+        return this._description;
+    }
+    set description(value) {
+        this._description = value;
+    }
+    get location() {
+        return this._location;
+    }
+    set location(value) {
+        this._location = value;
+    }
+    get createdBy() {
+        return this._createdBy;
+    }
+    get participants() {
+        return this._participants;
+    }
+    get notifications() {
+        return this._notifications;
     }
     // Métodos para User (Agregação *-*)
     addParticipant(user) {
-        if (!this.participants.some(p => p.id === user.id)) {
-            this.participants.push(user);
+        if (!this._participants.some(p => p.id === user.id)) {
+            this._participants.push(user);
             user.registerForEvent(this);
         }
     }
     // Métodos para AppNotification (Associação *-*)
     addNotification(notification) {
-        if (!this.notifications.some(n => n.id === notification.id)) {
-            this.notifications.push(notification);
+        if (!this._notifications.some(n => n.id === notification.id)) {
+            this._notifications.push(notification);
         }
     }
     // Outros métodos
     warning() {
-        console.log(`AppEvent "${this.name}" is coming soon!`);
+        console.log(`AppEvent "${this._name}" is coming soon!`);
     }
 }
 class AppNotification {
-    constructor(id, message, isRead, createdAt, recipient // Composição (*-1)
+    constructor(_id, _message, _isRead, _createdAt, _recipient // Composição (*-1)
     ) {
-        this.id = id;
-        this.message = message;
-        this.isRead = isRead;
-        this.createdAt = createdAt;
-        this.recipient = recipient;
+        this._id = _id;
+        this._message = _message;
+        this._isRead = _isRead;
+        this._createdAt = _createdAt;
+        this._recipient = _recipient;
+    }
+    get id() {
+        return this._id;
+    }
+    get message() {
+        return this._message;
+    }
+    set message(value) {
+        this._message = value;
+    }
+    get isRead() {
+        return this._isRead;
+    }
+    set isRead(value) {
+        this._isRead = value;
+    }
+    get createdAt() {
+        return this._createdAt;
+    }
+    set createdAt(value) {
+        this._createdAt = value;
+    }
+    get recipient() {
+        return this._recipient;
+    }
+    set recipient(value) {
+        this._recipient = value;
     }
     markAsRead() {
-        this.isRead = true;
+        this._isRead = true;
     }
 }
 class CustomReport {
-    constructor(id, date, type, content) {
-        this.id = id;
-        this.date = date;
-        this.type = type;
-        this.content = content;
+    constructor(_id, _date, _type, _content) {
+        this._id = _id;
+        this._date = _date;
+        this._type = _type;
+        this._content = _content;
+    }
+    get id() {
+        return this._id;
+    }
+    get date() {
+        return this._date;
+    }
+    set date(value) {
+        this._date = value;
+    }
+    get type() {
+        return this._type;
+    }
+    set type(value) {
+        this._type = value;
+    }
+    get content() {
+        return this._content;
+    }
+    set content(value) {
+        this._content = value;
     }
     generateReport() {
-        return this.content;
+        return this._content;
     }
 }
 class Resource {
-    constructor(id, name, description, price, category, supplier) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.price = price;
-        this.category = category;
-        this.supplier = supplier;
+    constructor(_id, _name, _description, _price, _category, _supplier) {
+        this._id = _id;
+        this._name = _name;
+        this._description = _description;
+        this._price = _price;
+        this._category = _category;
+        this._supplier = _supplier;
+    }
+    get id() {
+        return this._id;
+    }
+    get name() {
+        return this._name;
+    }
+    set name(value) {
+        this._name = value;
+    }
+    get description() {
+        return this._description;
+    }
+    set description(value) {
+        this._description = value;
+    }
+    get price() {
+        return this._price;
+    }
+    set price(value) {
+        this._price = value;
+    }
+    get category() {
+        return this._category;
+    }
+    set category(value) {
+        this._category = value;
+    }
+    get supplier() {
+        return this._supplier;
+    }
+    set supplier(value) {
+        this._supplier = value;
     }
 }
 class Sale {
-    constructor(id, date) {
-        this.id = id;
-        this.date = date;
-        this.resources = []; // Composição (*-*)
+    constructor(_id, _date) {
+        this._id = _id;
+        this._date = _date;
+        this._resources = []; // Composição (*-*)
     }
-    Resource(resource) {
-        this.resources.push(resource);
+    get id() {
+        return this._id;
+    }
+    get date() {
+        return this._date;
+    }
+    set date(value) {
+        this._date = value;
+    }
+    get resources() {
+        return this._resources;
+    }
+    addResource(resource) {
+        this._resources.push(resource);
     }
     totalAmount() {
-        return this.resources.reduce((sum, resource) => sum + resource.price, 0);
+        return this._resources.reduce((sum, resource) => sum + resource.price, 0);
     }
 }
 class ResourceGroup {
-    constructor(id, currentQuantity, expirationDate) {
-        this.id = id;
-        this.currentQuantity = currentQuantity;
-        this.expirationDate = expirationDate;
-        this.resources = []; // Composição (*-*)
+    constructor(_id, _currentQuantity, _expirationDate) {
+        this._id = _id;
+        this._currentQuantity = _currentQuantity;
+        this._expirationDate = _expirationDate;
+        this._resources = []; // Composição (*-*)
+    }
+    get id() {
+        return this._id;
+    }
+    get currentQuantity() {
+        return this._currentQuantity;
+    }
+    set currentQuantity(value) {
+        this._currentQuantity = value;
+    }
+    get expirationDate() {
+        return this._expirationDate;
+    }
+    set expirationDate(value) {
+        this._expirationDate = value;
+    }
+    get resources() {
+        return this._resources;
     }
     registerResource(resource) {
-        this.resources.push(resource);
+        this._resources.push(resource);
     }
     updateResource(resourceId, updateData) {
-        const resource = this.resources.find(p => p.id === resourceId);
+        const resource = this._resources.find(p => p.id === resourceId);
         if (resource) {
             Object.assign(resource, updateData);
         }
     }
     deleteResource(resourceId) {
-        this.resources = this.resources.filter(p => p.id !== resourceId);
+        this._resources = this._resources.filter(p => p.id !== resourceId);
     }
 }
 // ========== Example Usage ==========
@@ -266,7 +509,7 @@ console.log("\n=== Resource & Sales ===");
 const resource = new Resource(1, "Laptop", "High performance laptop", 999.99, "Electronics", "Tech Supplier");
 const sale = new Sale(1, new Date());
 // Add resource to the sale
-sale.Resource(resource);
+sale.addResource(resource);
 console.log("Sale total:", sale.totalAmount());
 console.log("\n=== ResourceGroup Management ===");
 const resourceGroup = new ResourceGroup(1, 10, new Date('2024-12-31'));
